@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ビアフェス My Map & Diary</title>
+<style>
+  :root {
+    --primary-color: #d97706;
+    --primary-hover: #b45309;
+    --bg-color: #f8fafc;
+    --card-bg: #ffffff;
+    --text-color: #1e293b;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --accent-color: #ef4444;
+  }
+  
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding-bottom: 40px;
+  }
+
+  header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 16px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  header p {
+    font-size: 0.8rem;
+    opacity: 0.9;
+    margin-top: 4px;
+  }
+
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 12px;
+  }
+
+  /* Controls */
+  .filter-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--card-bg);
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  .filter-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filter-bar label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .filter-bar input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary-color);
+  }
+
+  .style-select {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background-color: #fff;
+    color: var(--text-color);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .map-container {
+    position: relative;
+    width: 100%;
+    background-color: #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 2px solid #cbd5e1;
+    margin-bottom: 16px;
+  }
+
+  /* Map Wrapper */
+  .map-wrapper {
+    position: relative;
+    width: 100%;
+    padding-top: 119%; /* 907:1077 Aspect Ratio (画像サイズに合わせて適宜変更) */
+    background: #f1f5f9;
+  }
+
+  .map-wrapper img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  /* Booth Pins */
+  .pin {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.3s;
+    z-index: 10;
+  }
+
+  .pin:hover, .pin:active {
+    transform: translate(-50%, -110%) scale(1.15);
+  }
+
+  .pin-icon {
+    width: 32px;
+    height: 32px;
+    background-color: var(--primary-color);
+    border: 2px solid white;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+
+  .pin-icon span {
+    transform: rotate(45deg);
+    color: white;
+    font-weight: bold;
+    font-size: 0.75rem;
+  }
+
+  .pin.has-checked .pin-icon {
+    background-color: #10b981; /* Green for checked/want */
+  }
+
+  .pin.hidden {
+    display: none;
+  }
+
+  .pin-label {
+    position: absolute;
+    top: 34px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.75);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal-content {
+    background: var(--card-bg);
+    width: 100%;
+    max-width: 600px;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .modal-overlay.active .modal-content {
+    transform: translateY(0);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .modal-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+
+  /* Beer Card */
+  .beer-item {
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .beer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .beer-name {
+    font-weight: bold;
+    font-size: 1rem;
+    color: var(--text-color);
+  }
+
+  .beer-style {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .check-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    cursor: pointer;
+  }
+
+  .check-wrapper input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary-color);
+  }
+
+  /* Memo & Photo section */
+  .memo-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+  }
+
+  .memo-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    resize: vertical;
+    min-height: 50px;
+    margin-bottom: 8px;
+  }
+
+  .photo-upload-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e2e8f0;
+    color: #334155;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .photo-preview {
+    margin-top: 8px;
+    position: relative;
+    display: inline-block;
+  }
+
+  .photo-preview img {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    position: static; /* プレビュー用画像は絶対配置を解除 */
+  }
+
+  .photo-preview .remove-photo {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .guide-box {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 0.8rem;
+    color: #1e40af;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🍻 ビアフェス My Map</h1>
+  <p>タップしてビールチェック＆メモ保存</p>
+</header>
+
+<div class="container">
+  
+  <!-- Filter -->
+  <div class="filter-bar">
+    <div class="filter-row">
+      <label>
+        <input type="checkbox" id="filterChecked">
+        ⭐ 「飲みたい」ブースのみマップ表示
+      </label>
+    </div>
+    <div class="filter-row">
+      <label for="styleSelect" style="font-size: 0.85rem; font-weight: normal;">ビアスタイル絞り込み:</label>
+      <select id="styleSelect" class="style-select">
+        <option value="">すべて表示</option>
+        <option value="IPA">IPA系全般 (IPA / Hazy IPA 等)</option>
+        <option value="Stout">スタウト (Stout)</option>
+        <option value="Porter">ポーター (Porter)</option>
+        <option value="Fruit">フルーツビール (Fruit Ale)</option>
+        <option value="Weizen">ヴァイツェン (Weizen)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Map Area -->
+  <div class="map-container">
+    <div class="map-wrapper">
+      <!-- 実際のマップ画像を表示 (ファイル名に合わせて変更) -->
+      <img src="2026autumn.jpg" alt="会場マップ" id="mapImage">
+      
+      <!-- ピンを自動生成するためのコンテナ -->
+      <div id="pinContainer"></div>
+    </div>
+  </div>
+
+  <!-- Guide -->
+  <div class="guide-box">
+    <strong>💡 使い方</strong><br>
+    ・ピンをタップするとブースのビール一覧が開きます。<br>
+    ・「飲みたい」にチェックを入れるとマップに反映されます。<br>
+    ・メモや写真もその場ですぐ記録・保存できます。<br>
+    ・ブラウザを閉じてもデータは自動保存されます。
+  </div>
+
+</div>
+
+<!-- Modal Bottom Sheet -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-content" id="modalContent">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="boothTitle">ブース名</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);" id="boothLocation">場所説明</div>
+      </div>
+      <button class="close-btn" id="closeModalBtn">&times;</button>
+    </div>
+    <div id="beerListContainer">
+      <!-- Dynamic Beer Items -->
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ==========================================
+  // 1. ブース＆ビールデータ（51個分をここに記述）
+  // ==========================================
+  const boothData = [
+    {
+      id: 1,
+      name: "八ヶ岳ブルワリー タッチダウンビール",
+      location: "公式ページ掲載ブース",
+      top: 60,
+      left: 87,
+      beers: [
+        { id: "1-1", name: "ROCKヴァイツェン", style: "ピルスナー／ライトカラーラガー / Alc 5.5%", category: "ヴァイツェン", desc: "ヴァイツェン酵母由来のフルーティーな香り。" },
+        { id: "1-2", name: "ピルスナー", style: "ホワイトビール／ヴァイツェン / Alc 5.5%", category: "ピルスナー", desc: "フラッグシップビール" },
+        { id: "1-3", name: "デュンケル", style: "ダークラガー / Alc 5.5%", category: "Stout", desc: "香ばしい麦芽の風味が特徴の黒ビール。" },
+        { id: "1-4", name: "清里ラガー", style: "ラガー / Alc 5.5%", category: "ピルスナー", desc: "すっきりとした喉ごしのラガービール。" },
+        { id: "1-5", name: "ドライホップドヴァイツェン", style: "限定ビール / Alc 5.5%", category: "ヴァイツェン", desc: "限定醸造のドライホップヴァイツェン。" },
+        { id: "1-6", name: "水出しコーヒーラガー", style: "限定ビール / Alc 5.5%", category: "Stout", desc: "コーヒーの香りとラガーのコラボ。" },
+        { id: "1-7", name: "ROCK 55th ANNIVERSARY LAGER", style: "限定ビール / Alc 5.5%", category: "ピルスナー", desc: "アニバーサリー記念限定ラガー。" },
+        { id: "1-8", name: "清里IPL", style: "限定ビール / Alc 6.0%", category: "IPA", desc: "インディア・ペール・ラガー。" },
+        { id: "1-9", name: "虎八麦酒（とらはちばくしゅ）", style: "限定ビール / Alc 6.0%", category: "IPA", desc: "個性豊かな限定ビール。" },
+        { id: "1-10", name: "ROGGEN HELLES", style: "限定ビール / Alc 5.5%", category: "ピルスナー", desc: "ライ麦を使用したヘレス。" },
+        { id: "1-11", name: "プレミアム ロック・ボック", style: "限定ビール / Alc 7.0%", category: "Stout", desc: "濃厚でアルコール度数高めのボック。" },
+        { id: "1-12", name: "ドッペルボック", style: "限定ビール / Alc 7.5%", category: "Stout", desc: "重厚な味わいのドッペルボック。" },
+        { id: "1-13", name: "やまなしの桃ヴァイツェン", style: "限定ビール / Alc 5.0%", category: "Fruit", desc: "山梨県産の桃を使用したフルーツビール。" }
+      ]
+    },
+    {
+      id: 2,
+      name: "エチゴビール",
+      location: "公式ページ掲載ブース",
+      top: 55,
+      left: 82,
+      beers: [
+        { id: "2-1", name: "こしひかり越後ビール", style: "ピルスナー / Alc 5.0%", category: "ピルスナー", desc: "新潟産コしひかりを使用したすっきりビール。" },
+        { id: "2-2", name: "フライングIPA", style: "IPA / Alc 5.5%", category: "IPA", desc: "ホップの効いた爽快なIPA。" },
+        { id: "2-3", name: "プレミアムレッドエール", style: "レッドエール / Alc 5.5%", category: "Porter", desc: "芳醇な香りとコクのレッドエール。" },
+        { id: "2-4", name: "のんびりふんわり白ビール", style: "ヴァイツェン / Alc 5.0%", category: "Weizen", desc: "やさしい口当たりの白ビール。" },
+        { id: "2-5", name: "スパークラッシュレモン", style: "限定フルーツ / Alc 4.5%", category: "Fruit", desc: "レモンの爽やかな酸味が広がる限定ビール。" },
+        { id: "2-6", name: "シャインマスカットラガー", style: "限定フルーツ / Alc 5.0%", category: "Fruit", desc: "シャインマスカットの芳醇な香り。" },
+        { id: "2-7", name: "ルレクチェ＆ピーチホワイト", style: "限定フルーツ / Alc 5.0%", category: "Fruit", desc: "洋梨と桃の贅沢なホワイトビール。" },
+        { id: "2-8", name: "青りんごスパークリング", style: "限定フルーツ / Alc 4.5%", category: "Fruit", desc: "青りんごの爽快なスパークリングビール。" },
+        { id: "2-9", name: "潤いホップの惚れ惚れエール", style: "限定エール / Alc 5.0%", category: "IPA", desc: "ホップの潤いを感じるエール。" }
+      ]
+    },
+    {
+      id: 3,
+      name: "いわて蔵ビール",
+      location: "公式ページ掲載ブース",
+      top: 50,
+      left: 87,
+      beers: [
+        { id: "3-1", name: "Japanese Herb Ale 山椒", style: "ハーブエール / Alc 5.0%", category: "Fruit", desc: "山椒のピリッとしたアクセントが特徴。" },
+        { id: "3-2", name: "三陸牡蠣の黒ビール（オイスタースタウト）", style: "スタウト / Alc 6.0%", category: "Stout", desc: "三陸産の牡蠣を使ったコクのある黒ビール。" },
+        { id: "3-3", name: "アイリッシュスタイル・レッドエール", style: "レッドエール / Alc 5.0%", category: "Porter", desc: "香ばしさとキレのバランスが良いエール。" },
+        { id: "3-4", name: "桜嵐IPA", style: "IPA / Alc 6.5%", category: "IPA", desc: "華やかなホップ香が広がるIPA。" },
+        { id: "3-5", name: "シークレットビール", style: "限定ビール / Alc 6.0%", category: "IPA", desc: "何が出るかお楽しみのシークレット銘柄。" }
+      ]
+    },
+    {
+      id: 4,
+      name: "麦雑穀工房",
+      location: "公式ページ掲載ブース",
+      top: 45,
+      left: 82,
+      beers: [
+        { id: "4-1", name: "雑穀ヴァイツェン", style: "ヴァイツェン / Alc 5.0%", category: "Weizen", desc: "自家栽培の雑穀を使った優しいヴァイツェン。" },
+        { id: "4-2", name: "Mellow Times Lager", style: "ラガー / Alc 5.0%", category: "ピルスナー", desc: "ゆったりとした時間に合うラガー。" },
+        { id: "4-3", name: "夏への扉", style: "セゾン / Alc 5.5%", category: "Fruit", desc: "爽やかな飲み口のセゾンビール。" },
+        { id: "4-4", name: "山椒ポーター", style: "ポーター / Alc 5.5%", category: "Porter", desc: "ポーターの黒と山椒のスパイス感。" },
+        { id: "4-5", name: "イロドリセゾン", style: "限定セゾン / Alc 5.0%", category: "Fruit", desc: "彩り豊かな限定セゾン。" },
+        { id: "4-6", name: "Pine Pine", style: "限定缶ビール / Alc 6.0%", category: "Fruit", desc: "パインの風味が楽しい限定ビール。" }
+      ]
+    },
+    {
+      id: 5,
+      name: "Y.MARKET BREWING",
+      location: "公式ページ掲載ブース",
+      top: 40,
+      left: 87,
+      beers: [
+        { id: "5-1", name: "晴天交差点IPA", style: "IPA / Alc 6.0%", category: "IPA", desc: "すっきりとキレの良い定番IPA。" },
+        { id: "5-2", name: "Delay IPA", style: "IPA / Alc 6.5%", category: "IPA", desc: "後からしっかりホップが追いかけるIPA。" },
+        { id: "5-3", name: "稲武フレッシュホップファームハウスエール2026", style: "ファームハウスエール / Alc 5.5%", category: "Fruit", desc: "フレッシュホップの香る季節限定エール。" },
+        { id: "5-4", name: "GREEN TEA HAZY IPA", style: "Hazy IPA / Alc 6.5%", category: "IPA", desc: "緑茶の風味を取り入れた個性派ヘイジー。" },
+        { id: "5-5", name: "Purple Jet Sky", style: "IPA / Alc 6.0%", category: "IPA", desc: "鮮やかなインスピレーションのIPA。" },
+        { id: "5-6", name: "純生アルト", style: "アルト / Alc 5.0%", category: "Porter", desc: "モルトの旨味を感じる伝統的アルトビール。" },
+        { id: "5-7", name: "Hysteric IPA", style: "IPA / Alc 7.0%", category: "IPA", desc: "強烈なホップの個性を爆発させたIPA。" },
+        { id: "5-8", name: "NEW鬼ヶ島Ⅸ", style: "IPA / Alc 8.0%", category: "IPA", desc: "大人気鬼ヶ島シリーズの最新作。" }
+      ]
+    },
+    {
+      id: 6,
+      name: "CRAFT BANK",
+      location: "近畿",
+      top: 35,
+      left: 82,
+      beers: [
+        { id: "6-1", name: "KEYAKI ENGLISH IPL", style: "IPL / Alc 5.5%", category: "IPA", desc: "KEYAKI ENGLISH IPL" },
+        { id: "6-2", name: "BANK IPA", style: "IPA / Alc 6.0%", category: "IPA", desc: "BANK IPA" },
+        { id: "6-3", name: "KYOKU", style: "ビール / Alc 5.0%", category: "ピルスナー", desc: "KYOKU" },
+        { id: "6-4", name: "BAGMAN IPA", style: "IPA / Alc 6.5%", category: "IPA", desc: "BAGMAN IPA" },
+        { id: "6-5", name: "BITTER BUG", style: "ビール / Alc 5.5%", category: "Porter", desc: "BITTER BUG" },
+        { id: "6-6", name: "COFFEE STOUT", style: "限定 / Alc 6.0%", category: "Stout", desc: "コーヒーを使った限定スタウト" },
+        { id: "6-7", name: "LIME CRIME", style: "ビール / Alc 5.0%", category: "Fruit", desc: "ライム風味のビール" },
+        { id: "6-8", name: "LAB COAT", style: "ビール / Alc 5.5%", category: "ピルスナー", desc: "LAB COAT" }
+      ]
+    },
+    {
+      id: 7,
+      name: "別府ブルワリー",
+      location: "九州・沖縄",
+      top: 30,
+      left: 87,
+      beers: [
+        { id: "7-1", name: "Alsace Hopped Pils", style: "ピルスナー / Alc 5.0%", category: "ピルスナー", desc: "アルザス産ホップを使用したピルスナー" },
+        { id: "7-2", name: "Kabosu Saison（2026初摘みバージョン）", style: "セゾン / Alc 5.0%", category: "Fruit", desc: "2026初摘みカボスを使用したおすすめセゾン" },
+        { id: "7-3", name: "Oni IPA", style: "IPA / Alc 6.0%", category: "IPA", desc: "鬼のようにホップが効いたIPA" },
+        { id: "7-4", name: "Noyaki Dark Lager", style: "ダークラガー / Alc 5.5%", category: "Stout", desc: "野焼きをイメージしたダークラガー" },
+        { id: "7-5", name: "Volcanic Cloud", style: "ビール / Alc 6.5%", category: "IPA", desc: "火山雲をイメージした個性派ビール" },
+        { id: "7-6", name: "COCO Yu-Topia", style: "ビール / Alc 5.5%", category: "Fruit", desc: "南国感あふれるユートピアビール" }
+      ]
+    },
+    {
+      id: 8,
+      name: "ISEKADO",
+      location: "東海",
+      top: 53,
+      left: 77,
+      beers: [
+        { id: "8-1", name: "Classic PALE ALE", style: "ペールエール / Alc 5.0%", category: "ピルスナー", desc: "王道のクラシックペールエール" },
+        { id: "8-2", name: "HIME WHITE", style: "ホワイトエール / Alc 5.0%", category: "Weizen", desc: "爽やかな香りのヒメホワイト" },
+        { id: "8-3", name: "ねこにひき", style: "Hazy IPA / Alc 6.0%", category: "IPA", desc: "大人気のヘイジーIPA" },
+        { id: "8-4", name: "おひさまエール", style: "エール / Alc 5.0%", category: "Fruit", desc: "明るい日差しにぴったりのエール" },
+        { id: "8-5", name: "West Coast Pilsner", style: "ピルスナー / Alc 5.5%", category: "IPA", desc: "西海岸風のピルスナー" },
+        { id: "8-6", name: "ISEKADO 期間限定ビール", style: "限定 / Alc 6.0%", category: "IPA", desc: "期間限定のスペシャルビール" }
+      ]
+    },
+    {
+      id: 9,
+      name: "Kyoto Brewing CO.",
+      location: "近畿",
+      top: 57,
+      left: 74,
+      beers: [
+        { id: "9-1", name: "火の鳥たち", style: "限定 / Alc 6.0%", category: "IPA", desc: "限定醸造の火の鳥たち" },
+        { id: "9-2", name: "一期一会", style: "セゾン / Alc 5.0%", category: "Fruit", desc: "ベルジャンセゾン" },
+        { id: "9-3", name: "一意専心", style: "IPA / Alc 6.5%", category: "IPA", desc: "アメリカンIPA" },
+        { id: "9-4", name: "週休6日", style: "セッションIPA / Alc 4.5%", category: "IPA", desc: "ドリンカブルなセッションIPA" },
+        { id: "9-5", name: "夏の気まぐれ", style: "ビール / Alc 5.0%", category: "Fruit", desc: "季節の気まぐれビール" },
+        { id: "9-6", name: "秋の気まぐれ", style: "ビール / Alc 5.5%", category: "Porter", desc: "秋向けの気まぐれビール" },
+        { id: "9-7", name: "乳糖依存症", style: "限定 / Alc 6.5%", category: "Stout", desc: "ミルクスタウト系の限定ビール" },
+        { id: "9-8", name: "天体観望", style: "限定 / Alc 6.0%", category: "IPA", desc: "夜空を思わせる限定IPA" },
+        { id: "9-9", name: "潤", style: "限定 / Alc 5.0%", category: "Fruit", desc: "潤いを感じる限定ビール" },
+        { id: "9-10", name: "つぶつむ", style: "限定 / Alc 5.0%", category: "Fruit", desc: "ユニークな限定ビール" },
+        { id: "9-11", name: "かんぱい", style: "ビール / Alc 5.0%", category: "ピルスナー", desc: "乾杯にぴったりのビール" }
+      ]
+    },
+    {
+      id: 10,
+      name: "ヒメビール",
+      location: "中国・四国",
+      top: 61,
+      left: 77,
+      beers: [
+        { id: "10-1", name: "カラン いよかんフルーツエール", style: "フルーツエール / Alc 5.0%", category: "Fruit", desc: "いよかんの香るフルーツエール" },
+        { id: "10-2", name: "カラン 日向夏フルーツエール", style: "フルーツエール / Alc 5.0%", category: "Fruit", desc: "日向夏の爽やかなフルーツエール" },
+        { id: "10-3", name: "カラン ブラッドオレンジフルーツエール", style: "フルーツエール / Alc 5.0%", category: "Fruit", desc: "ブラッドオレンジの酸味と甘み" },
+        { id: "10-4", name: "ル・レクチェ フルーツエール", style: "フルーツエール / Alc 5.0%", category: "Fruit", desc: "洋梨ル・レクチェの上品な風味" },
+        { id: "10-5", name: "ドルトムンダー", style: "ラガー / Alc 5.5%", category: "ピルスナー", desc: "王道のドルトムンダーラガー" },
+        { id: "10-6", name: "HIME BEER セゾン", style: "セゾン / Alc 5.0%", category: "Fruit", desc: "すっきり飲めるセゾン" },
+        { id: "10-7", name: "HIME BEER ペールエール", style: "ペールエール / Alc 5.0%", category: "ピルスナー", desc: "香ばしいペールエール" },
+        { id: "10-8", name: "HIME BEER IPA", style: "IPA / Alc 6.0%", category: "IPA", desc: "しっかりとした苦みのIPA" }
+      ]
+    },
+    {
+      id: 11,
+      name: "AGARIHAMA BREWERY",
+      location: "九州・沖縄",
+      top: 65,
+      left: 74,
+      beers: [
+        { id: "11-1", name: "けやき先行開栓シーサー＆ドラゴン", style: "限定 / Alc 6.0%", category: "IPA", desc: "けやき先行開栓の限定ビール" },
+        { id: "11-2", name: "AGARIHAMA IPA", style: "IPA / Alc 6.5%", category: "IPA", desc: "あがり浜のフラッグシップIPA" },
+        { id: "11-3", name: "SUNRISE PALE ALE", style: "ペールエール / Alc 5.0%", category: "ピルスナー", desc: "サンライズをイメージしたペールエール" },
+        { id: "11-4", name: "GAJUMARU WIPA", style: "W-IPA / Alc 8.0%", category: "IPA", desc: "ガジュマル名義のダブルIPA" },
+        { id: "11-5", name: "HOPEMOTION", style: "IPA / Alc 6.0%", category: "IPA", desc: "ホップの情熱を感じるIPA" },
+        { id: "11-6", name: "金城マンゴーエール", style: "限定フルーツ / Alc 5.0%", category: "Fruit", desc: "マンゴーを使用した限定エール" },
+        { id: "11-7", name: "石垣島ライスラガー", style: "ラガー / Alc 5.0%", category: "ピルスナー", desc: "石垣島のお米を使ったラガー" },
+        { id: "11-8", name: "すいかに～に～#2", style: "限定フルーツ / Alc 4.5%", category: "Fruit", desc: "スイカを使ったユニークな限定ビール" }
+      ]
+    },
+    {
+      id: 12,
+      name: "BLUE MAGIC",
+      location: "関東",
+      top: 69,
+      left: 77,
+      beers: [
+        { id: "12-1", name: "BM Keyaki SP", style: "限定 / Alc 6.5%", category: "IPA", desc: "けやきひろばビール祭り向けのスペシャル限定ビール" }
+      ]
+    },
+    {
+      id: 13,
+      name: "U.B.P BREWERY",
+      location: "関東",
+      top: 73,
+      left: 74,
+      beers: [
+        { id: "13-1", name: "KEYAKI ANTHENM", style: "限定 / Alc -", category: "IPA", desc: "おすすめ限定ビール" },
+        { id: "13-2", name: "URAWA CITY ALE", style: "ビール / Alc -", category: "ピルスナー", desc: "URAWA CITY ALE" },
+        { id: "13-3", name: "Kickoff Pils", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "Kickoff Pils" },
+        { id: "13-4", name: "彩白～IROHA～", style: "ビール / Alc -", category: "Weizen", desc: "彩白～IROHA～" }
+      ]
+    },
+    {
+      id: 14,
+      name: "Yellow Beer Works",
+      location: "東北",
+      top: 71,
+      left: 64,
+      beers: [
+        { id: "14-1", name: "けやきビール（仮）", style: "限定 / Alc -", category: "IPA", desc: "おすすめ限定ビール" },
+        { id: "14-2", name: "Hazy IPA", style: "IPA / Alc -", category: "IPA", desc: "Hazy IPA" },
+        { id: "14-3", name: "IPA", style: "IPA / Alc -", category: "IPA", desc: "IPA" },
+        { id: "14-4", name: "Rice lager", style: "ラガー / Alc -", category: "ピルスナー", desc: "Rice lager" },
+        { id: "14-5", name: "フルーツサワーエール", style: "サワーエール / Alc -", category: "Fruit", desc: "フルーツサワーエール" },
+        { id: "14-6", name: "ラッシーサワーエール", style: "サワーエール / Alc -", category: "Fruit", desc: "おすすめラッシーサワーエール" },
+        { id: "14-7", name: "シークレット", style: "限定 / Alc -", category: "IPA", desc: "シークレットビール" }
+      ]
+    },
+    {
+      id: 15,
+      name: "鳴子温泉ブルワリー",
+      location: "東北",
+      top: 67,
+      left: 61,
+      beers: [
+        { id: "15-1", name: "高原ラガー", style: "ラガー / Alc -", category: "ピルスナー", desc: "おすすめ高原ラガー" },
+        { id: "15-2", name: "ゆきむすび", style: "ビール / Alc -", category: "ピルスナー", desc: "ゆきむすび" },
+        { id: "15-3", name: "山ぶどう", style: "フルーツビール / Alc -", category: "Fruit", desc: "山ぶどうビール" },
+        { id: "15-4", name: "パイナップル", style: "フルーツビール / Alc -", category: "Fruit", desc: "パイナップルビール" }
+      ]
+    },
+    {
+      id: 16,
+      name: "反射炉ビヤ",
+      location: "東海",
+      top: 63,
+      left: 64,
+      beers: [
+        { id: "16-1", name: "Keyaki Coast IPA 2026秋ver.", style: "IPA / Alc -", category: "IPA", desc: "限定Keyaki Coast IPA 2026秋ver." },
+        { id: "16-2", name: "New World Kölsch", style: "ケルシュ / Alc -", category: "ピルスナー", desc: "New World Kölsch" },
+        { id: "16-3", name: "早雲", style: "ビール / Alc -", category: "ピルスナー", desc: "早雲" },
+        { id: "16-4", name: "Poseidon's Brew", style: "ビール / Alc -", category: "IPA", desc: "Poseidon's Brew" },
+        { id: "16-5", name: "Cream Horizon", style: "ビール / Alc -", category: "IPA", desc: "Cream Horizon" },
+        { id: "16-6", name: "太郎左衛門", style: "ビール / Alc -", category: "Porter", desc: "太郎左衛門" },
+        { id: "16-7", name: "頼朝", style: "ビール / Alc -", category: "Porter", desc: "頼朝" },
+        { id: "16-8", name: "ピーチホワイトIPA～夢みずきVer.～", style: "IPA / Alc -", category: "Weizen", desc: "限定ピーチホワイトIPA～夢みずきVer.～" },
+        { id: "16-9", name: "Yellow Peach Juice", style: "フルーツ / Alc -", category: "Fruit", desc: "Yellow Peach Juice" }
+      ]
+    },
+    {
+      id: 17,
+      name: "オラホビール",
+      location: "北陸・甲信越",
+      top: 61,
+      left: 61,
+      beers: [
+        { id: "17-1", name: "ビエール・ド・雷電季節仕込みビール 秋仕込みIPA", style: "IPA / Alc -", category: "IPA", desc: "おすすめ限定秋仕込みIPA" },
+        { id: "17-2", name: "キャプテンクロウクレイジーヘイジージョー", style: "Hazy IPA / Alc -", category: "IPA", desc: "限定キャプテンクロウクレイジーヘイジージョー" },
+        { id: "17-3", name: "ビエール・ド・雷電季節仕込みビール 夏仕込みヴァイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "限定夏仕込みヴァイツェン" },
+        { id: "17-4", name: "シークレットビール", style: "限定 / Alc -", category: "IPA", desc: "シークレットビール" }
+      ]
+    },
+    {
+      id: 18,
+      name: "遠野麦酒ZUMONA",
+      location: "東北",
+      top: 57,
+      left: 64,
+      beers: [
+        { id: "18-1", name: "IBUKI HOP IPA for KEYAKI", style: "IPA / Alc -", category: "IPA", desc: "おすすめ限定IBUKI HOP IPA for KEYAKI" },
+        { id: "18-2", name: "HOP HARVEST IPL", style: "IPL / Alc -", category: "IPA", desc: "限定HOP HARVEST IPL" },
+        { id: "18-3", name: "TONO HOPS LAGER（遠野ポップスラガー）", style: "ラガー / Alc -", category: "ピルスナー", desc: "限定TONO HOPS LAGER" },
+        { id: "18-4", name: "遠い秋 HAZY LAGER", style: "ラガー / Alc -", category: "ピルスナー", desc: "限定遠い秋 HAZY LAGER" },
+        { id: "18-5", name: "遠野のホップ農家から", style: "限定 / Alc -", category: "IPA", desc: "限定遠野のホップ農家から" },
+        { id: "18-6", name: "ゴールデンピルスナー", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "ゴールデンピルスナー" }
+      ]
+    },
+    {
+      id: 19,
+      name: "宮崎ひでじビール",
+      location: "九州・沖縄",
+      top: 53,
+      left: 61,
+      beers: [
+        { id: "19-1", name: "日南レモン 生搾り Session Hazy IPA", style: "Session Hazy IPA / Alc -", category: "IPA", desc: "おすすめ限定日南レモン 生搾り Session Hazy IPA" },
+        { id: "19-2", name: "太陽のラガー", style: "ラガー / Alc -", category: "ピルスナー", desc: "太陽のラガー（ワールド・ビア・カップ2023 受賞）" },
+        { id: "19-3", name: "九州CRAFT日向夏", style: "フルーツラガー / Alc -", category: "Fruit", desc: "九州CRAFT日向夏" },
+        { id: "19-4", name: "栗黒 （KURI KURO) インペリアルスタウト", style: "インペリアルスタウト / Alc -", category: "Stout", desc: "栗黒 インペリアルスタウト" },
+        { id: "19-5", name: "琥珀の幸福 （アンバーラガー）", style: "アンバーラガー / Alc -", category: "ピルスナー", desc: "限定琥珀の幸福" },
+        { id: "19-6", name: "きんかんヴァイツェン （フルーツ ヴァイツェン）", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "限定きんかんヴァイツェン" },
+        { id: "19-7", name: "九州CRAFT かぽす （フルーツエール）", style: "フルーツエール / Alc -", category: "Fruit", desc: "九州CRAFT かぼす" },
+        { id: "19-8", name: "日向月夜 （Citrus Dark Lager）", style: "ダークラガー / Alc -", category: "Stout", desc: "限定日向月夜" }
+      ]
+    },
+    {
+      id: 20,
+      name: "南信州ビール",
+      location: "北陸・甲信越",
+      top: 42,
+      left: 58,
+      beers: [
+        { id: "20-1", name: "アップルホップ", style: "フルーツビール / Alc -", category: "Fruit", desc: "おすすめアップルホップ" },
+        { id: "20-2", name: "ヤマソーホップ", style: "フルーツビール / Alc -", category: "Fruit", desc: "ヤマソーホップ" },
+        { id: "20-3", name: "アルプスヴァイツエン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "季節限定アルプスヴァイツエン" },
+        { id: "20-4", name: "オクト―バーフェスト", style: "ラガー / Alc -", category: "ピルスナー", desc: "季節限定オクト―バーフェスト" },
+        { id: "20-5", name: "シークレットビール", style: "限定 / Alc -", category: "IPA", desc: "シークレットビール" }
+      ]
+    },
+    {
+      id: 21,
+      name: "サンクトガーレン",
+      location: "関東",
+      top: 37,
+      left: 56,
+      beers: [
+        { id: "21-1", name: "湘南ゴールド", style: "フルーツエール / Alc -", category: "Fruit", desc: "おすすめ湘南ゴールド" },
+        { id: "21-2", name: "和梨のヴァイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "和梨のヴァイツェン" },
+        { id: "21-3", name: "7種の桃のエール", style: "フルーツエール / Alc -", category: "Fruit", desc: "7種の桃のエール" },
+        { id: "21-4", name: "Fresh Hop IPA", style: "IPA / Alc -", category: "IPA", desc: "おすすめFresh Hop IPA" },
+        { id: "21-5", name: "パイナップルエール", style: "フルーツエール / Alc -", category: "Fruit", desc: "パイナップルエール" },
+        { id: "21-6", name: "YOKOHAMA XPA", style: "IPA / Alc -", category: "IPA", desc: "YOKOHAMA XPA" },
+        { id: "21-7", name: "ゴールデンエール", style: "エール / Alc -", category: "ピルスナー", desc: "ゴールデンエール" },
+        { id: "21-8", name: "アップルシナモンエール", style: "エール / Alc -", category: "Fruit", desc: "アップルシナモンエール" }
+      ]
+    },
+    {
+      id: 22,
+      name: "hokkaido brewing",
+      location: "北海道",
+      top: 33,
+      left: 53,
+      beers: [
+        { id: "22-1", name: "ビンテージエール2008", style: "限定 / Alc -", category: "IPA", desc: "【けやき限定】おすすめビンテージエール2008" },
+        { id: "22-2", name: "ゆうばりメロンエール", style: "フルーツエール / Alc -", category: "Fruit", desc: "おすすめゆうばりメロンエール" },
+        { id: "22-3", name: "小樽ラガー", style: "ラガー / Alc -", category: "ピルスナー", desc: "小樽ラガー" },
+        { id: "22-4", name: "ナイアガラエール", style: "エール / Alc -", category: "Fruit", desc: "ナイアガラエール" },
+        { id: "22-5", name: "ゴールデンパインエール", style: "フルーツエール / Alc -", category: "Fruit", desc: "ゴールデンパインエール" },
+        { id: "22-6", name: "ゴールドIPA", style: "IPA / Alc -", category: "IPA", desc: "ゴールドIPA" },
+        { id: "22-7", name: "小樽ブルー", style: "ビール / Alc -", category: "ピルスナー", desc: "小樽ブルー" },
+        { id: "22-8", name: "ストロベリーエール", style: "フルーツエール / Alc -", category: "Fruit", desc: "ストロベリーエール" }
+      ]
+    },
+    {
+      id: 23,
+      name: "松江ビアへるん＆日本海アワビ",
+      location: "中国・四国",
+      top: 25,
+      left: 56,
+      beers: [
+        { id: "23-1", name: "しじみヴァイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "限定しじみヴァイツェン" },
+        { id: "23-2", name: "山椒ホワイトエール", style: "ホワイトエール / Alc -", category: "Weizen", desc: "おすすめ限定山椒ホワイトエール" },
+        { id: "23-3", name: "どぶろくびーる「おろち翠」七冠馬ver", style: "限定 / Alc -", category: "Fruit", desc: "おすすめ限定どぶろくびーる" },
+        { id: "23-4", name: "コーヒーブロンド／ｊへるんのひととき", style: "限定 / Alc -", category: "Stout", desc: "限定コーヒーブロンド" },
+        { id: "23-5", name: "蜂蜜ビール「しんじ湖MOON」島根蜂蜜ver", style: "限定 / Alc -", category: "Fruit", desc: "限定蜂蜜ビール" },
+        { id: "23-6", name: "駅弁AGARUビール", style: "限定 / Alc -", category: "ピルスナー", desc: "限定駅弁AGARUビール" },
+        { id: "23-7", name: "怪談ぶどうスパークリング", style: "限定 / Alc -", category: "Fruit", desc: "限定怪談ぶどうスパークリング" },
+        { id: "23-8", name: "黒糖トリペル", style: "限定 / Alc -", category: "Stout", desc: "限定黒糖トリペル" },
+        { id: "23-9", name: "ゆずフレッシュ", style: "限定 / Alc -", category: "Fruit", desc: "限定ゆずフレッシュ" },
+        { id: "23-10", name: "生ホップビール！ゼウスビター", style: "限定 / Alc -", category: "IPA", desc: "限定生ホップビール！ゼウスビター" },
+        { id: "23-11", name: "ヴァイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "ヴァイツェン" },
+        { id: "23-12", name: "縁結麦酒スタウト", style: "スタウト / Alc -", category: "Stout", desc: "縁結麦酒スタウト" },
+        { id: "23-13", name: "ペールエール", style: "ペールエール / Alc -", category: "ピルスナー", desc: "ペールエール" }
+      ]
+    },
+    {
+      id: 24,
+      name: "Nobody Brewing",
+      location: "関東",
+      top: 23,
+      left: 45,
+      beers: [
+        { id: "24-1", name: "Birds Of Fire", style: "限定 / Alc -", category: "IPA", desc: "おすすめ限定Birds Of Fire" },
+        { id: "24-2", name: "The Glitch", style: "ビール / Alc -", category: "IPA", desc: "The Glitch" },
+        { id: "24-3", name: "The Folk", style: "ビール / Alc -", category: "IPA", desc: "The Folk" },
+        { id: "24-4", name: "The Slowcore", style: "ビール / Alc -", category: "IPA", desc: "The Slowcore" },
+        { id: "24-5", name: "The Leftfield", style: "ビール / Alc -", category: "IPA", desc: "おすすめThe Leftfield" },
+        { id: "24-6", name: "The Minimal", style: "ビール / Alc -", category: "IPA", desc: "The Minimal" },
+        { id: "24-7", name: "The House", style: "ビール / Alc -", category: "IPA", desc: "The House" },
+        { id: "24-8", name: "The Triphop", style: "ビール / Alc -", category: "IPA", desc: "The Triphop" },
+        { id: "24-9", name: "The Jig", style: "ビール / Alc -", category: "IPA", desc: "The Jig" },
+        { id: "24-10", name: "[数量限定]シークレットビール from TEENAGE", style: "限定 / Alc -", category: "IPA", desc: "数量限定シークレットビール" }
+      ]
+    },
+    {
+      id: 25,
+      name: "うしとらブルワリー",
+      location: "関東",
+      top: 25,
+      left: 22,
+      beers: [
+        { id: "25-1", name: "けやきスペシャルビール（名称未定）", style: "限定 / Alc -", category: "IPA", desc: "限定けやきスペシャルビール" },
+        { id: "25-2", name: "いちご王国 -Strawberry Kingdom-", style: "限定 / Alc -", category: "Fruit", desc: "おすすめ限定いちご王国" },
+        { id: "25-3", name: "どろよい - Hazy Double IPA -", style: "Hazy DIPA / Alc -", category: "IPA", desc: "おすすめ限定どろよい" },
+        { id: "25-4", name: "阿修羅トリプルIPA", style: "Triple IPA / Alc -", category: "IPA", desc: "限定阿修羅トリプルIPA" },
+        { id: "25-5", name: "ミヤシタパークIPA", style: "IPA / Alc -", category: "IPA", desc: "限定ミヤシタパークIPA" },
+        { id: "25-6", name: "乱穫注意（桃ヴァイツェンボック）", style: "ヴァイツェンボック / Alc -", category: "Weizen", desc: "限定乱穫注意" },
+        { id: "25-7", name: "じっくりコトコト仕込んだピルス", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "限定じっくりコトコト仕込んだピルス" },
+        { id: "25-8", name: "苦そうで苦くない少し苦いシュバルツ", style: "シュバルツ / Alc -", category: "Stout", desc: "限定苦そうで苦くない少し苦いシュバルツ" },
+        { id: "25-9", name: "キラ星☆夏みかんサワー", style: "サワーエール / Alc -", category: "Fruit", desc: "キラ星☆夏みかんサワー" },
+        { id: "25-10", name: "おも白いびぃる", style: "限定 / Alc -", category: "IPA", desc: "限定おも白いびぃる" },
+        { id: "25-11", name: "ちょ、ラテよ！", style: "限定 / Alc -", category: "Stout", desc: "限定ちょ、ラテよ！" }
+      ]
+    },
+    {
+      id: 26,
+      name: "およろこBrewery",
+      location: "東海",
+      top: 27,
+      left: 25,
+      beers: [
+        { id: "26-1", name: "KEYAKI ジャスミン＆トマトエール", style: "エール / Alc -", category: "Fruit", desc: "おすすめKEYAKI ジャスミン＆トマトエール" },
+        { id: "26-2", name: "〜援〜ブルーベリーエール", style: "エール / Alc -", category: "Fruit", desc: "おすすめ〜援〜ブルーベリーエール" },
+        { id: "26-3", name: "〜喜〜ペールエール", style: "ペールエール / Alc -", category: "ピルスナー", desc: "〜喜〜ペールエール" },
+        { id: "26-4", name: "〜歓〜ピルスナー", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "〜歓〜ピルスナー" },
+        { id: "26-5", name: "〜慶〜ヴァイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "〜慶〜ヴァイツェン" },
+        { id: "26-6", name: "〜悦〜W-IPA", style: "W-IPA / Alc -", category: "IPA", desc: "〜悦〜W-IPA" },
+        { id: "26-7", name: "チェリー＆ラズベリーエール", style: "フルーツエール / Alc -", category: "Fruit", desc: "チェリー＆ラズベリーエール" }
+      ]
+    },
+    {
+      id: 27,
+      name: "そじ坊・杵屋",
+      location: "関東",
+      top: 29,
+      left: 22,
+      beers: [
+        { id: "27-1", name: "サッポロ生ビール", style: "ビール / Alc -", category: "ピルスナー", desc: "おすすめサッポロ生ビール" }
+      ]
+    },
+    {
+      id: 28,
+      name: "KOBO Brewery",
+      location: "北陸・甲信越",
+      top: 31,
+      left: 25,
+      beers: [
+        { id: "28-1", name: "KEYAKI DesítkaⅠ.", style: "ビール / Alc -", category: "ピルスナー", desc: "おすすめKEYAKI DesítkaⅠ." },
+        { id: "28-2", name: "プレミアントピルスナー", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "おすすめプレミアントピルスナー" },
+        { id: "28-3", name: "3Aラガー", style: "ラガー / Alc -", category: "ピルスナー", desc: "3Aラガー" },
+        { id: "28-4", name: "ダークラガー", style: "ダークラガー / Alc -", category: "Stout", desc: "ダークラガー" },
+        { id: "28-5", name: "ヴァイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "ヴァイツェン" },
+        { id: "28-6", name: "CRAZY", style: "ビール / Alc -", category: "IPA", desc: "CRAZY" },
+        { id: "28-7", name: "RED SOULⅠ.", style: "ビール / Alc -", category: "IPA", desc: "RED SOULⅠ." },
+        { id: "28-8", name: "KOTAS'S HOPPY 50th", style: "ビール / Alc -", category: "IPA", desc: "KOTAS'S HOPPY 50th" },
+        { id: "28-9", name: "インペリアルスタウト", style: "インペリアルスタウト / Alc -", category: "Stout", desc: "限定インペリアルスタウト" }
+      ]
+    },
+    {
+      id: 29,
+      name: "ティー・ワイ・ハーバーブルワリー",
+      location: "関東",
+      top: 33,
+      left: 22,
+      beers: [
+        { id: "29-1", name: "けやきまるごとピーチ", style: "限定 / Alc -", category: "Fruit", desc: "限定けやきまるごとピーチ" }
+      ]
+    },
+    {
+      id: 30,
+      name: "CHORYO Craft Beer",
+      location: "近畿",
+      top: 35,
+      left: 25,
+      beers: [
+        { id: "30-1", name: "ライスラガ―", style: "ラガー / Alc -", category: "ピルスナー", desc: "ライスラガー" },
+        { id: "30-2", name: "欅ノミツコ", style: "限定 / Alc -", category: "Fruit", desc: "おすすめ限定欅ノミツコ" },
+        { id: "30-3", name: "NZ WC HAZY IPA", style: "Hazy IPA / Alc -", category: "IPA", desc: "NZ WC HAZY IPA" },
+        { id: "30-4", name: "L.A.F.A", style: "Fruited Ale / Alc -", category: "Fruit", desc: "L.A.F.A w/Japanese Black Tea & Peach" },
+        { id: "30-5", name: "龒 -Rin- Pastry Sour", style: "Pastry Sour / Alc -", category: "Fruit", desc: "龒 -Rin- Pastry Sour -Red Fruit Blend-" },
+        { id: "30-6", name: "NARA CRUSH", style: "ビール / Alc -", category: "IPA", desc: "NARA CRUSH" },
+        { id: "30-7", name: "Krush/Mosaic HAZY IPA", style: "Hazy IPA / Alc -", category: "IPA", desc: "Krush/Mosaic HAZY IPA" },
+        { id: "30-8", name: "SUMMER ALE", style: "エール / Alc -", category: "ピルスナー", desc: "SUMMER ALE" },
+        { id: "30-9", name: "Ride The Dragon", style: "限定 / Alc -", category: "IPA", desc: "限定Ride The Dragon" },
+        { id: "30-10", name: "SESSION IPA", style: "セッションIPA / Alc -", category: "IPA", desc: "限定SESSION IPA" },
+        { id: "30-11", name: "SOUR HAZY IPA", style: "Sour Hazy IPA / Alc -", category: "IPA", desc: "SOUR HAZY IPA" },
+        { id: "30-12", name: "NZ PILSNER", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "NZ PILSNER" },
+        { id: "30-13", name: "HAZY IPA春", style: "Hazy IPA / Alc -", category: "IPA", desc: "限定HAZY IPA春" },
+        { id: "30-14", name: "HAZY IPA夏", style: "Hazy IPA / Alc -", category: "IPA", desc: "限定HAZY IPA夏" },
+        { id: "30-15", name: "SMOOTH DARK LAGER", style: "ダークラガー / Alc -", category: "Stout", desc: "限定SMOOTH DARK LAGER" }
+      ]
+    },
+    {
+      id: 31,
+      name: "Brasserie Knot",
+      location: "北海道",
+      top: 37,
+      left: 22,
+      beers: [
+        { id: "31-1", name: "NoMaps'26", style: "限定 / Alc -", category: "IPA", desc: "おすすめ限定NoMaps'26" },
+        { id: "31-2", name: "FLOWER", style: "ビール / Alc -", category: "ピルスナー", desc: "FLOWER" },
+        { id: "31-3", name: "BIRD", style: "ビール / Alc -", category: "IPA", desc: "BIRD" },
+        { id: "31-4", name: "WIND", style: "ビール / Alc -", category: "IPA", desc: "WIND" },
+        { id: "31-5", name: "MOON", style: "ビール / Alc -", category: "Stout", desc: "MOON" },
+        { id: "31-6", name: "AWA", style: "限定 / Alc -", category: "IPA", desc: "限定AWA" },
+        { id: "31-7", name: "RIVER", style: "限定 / Alc -", category: "IPA", desc: "限定RIVER" },
+        { id: "31-8", name: "MOSETSURI", style: "限定 / Alc -", category: "IPA", desc: "限定MOSETSURI" },
+        { id: "31-9", name: "NORA", style: "限定 / Alc -", category: "IPA", desc: "限定NORA" }
+      ]
+    },
+    {
+      id: 32,
+      name: "スモーク・クラフト",
+      location: "関東",
+      top: 39,
+      left: 25,
+      beers: [
+        { id: "32-1", name: "ソラ", style: "スモークビール / Alc -", category: "Stout", desc: "おすすめソラ" },
+        { id: "32-2", name: "ファラオ", style: "スモークビール / Alc -", category: "Stout", desc: "おすすめファラオ" },
+        { id: "32-3", name: "スモーク・レモン", style: "スモークビール / Alc -", category: "Fruit", desc: "スモーク・レモン" },
+        { id: "32-4", name: "スモーキン", style: "スモークビール / Alc -", category: "Stout", desc: "スモーキン" },
+        { id: "32-5", name: "ラプサン", style: "スモークビール / Alc -", category: "Stout", desc: "ラプサン" },
+        { id: "32-6", name: "オフピート", style: "スモークビール / Alc -", category: "Stout", desc: "おすすめオフピート" },
+        { id: "32-7", name: "梅干しスモーキン", style: "スモークビール / Alc -", category: "Fruit", desc: "梅干しスモーキン" }
+      ]
+    },
+    {
+      id: 33,
+      name: "妻有ビール",
+      location: "北陸・甲信越",
+      top: 41,
+      left: 22,
+      beers: [
+        { id: "33-1", name: "なでしこIPAその八 けやき編", style: "IPA / Alc -", category: "IPA", desc: "おすすめなでしこIPAその八 けやき編" },
+        { id: "33-2", name: "豪雪ペールエール", style: "ペールエール / Alc -", category: "ピルスナー", desc: "豪雪ペールエール" },
+        { id: "33-3", name: "めでたしゴールデンエール", style: "ゴールデンエール / Alc -", category: "ピルスナー", desc: "めでたしゴールデンエール" },
+        { id: "33-4", name: "十日町そばエール", style: "エール / Alc -", category: "ピルスナー", desc: "十日町そばエール" },
+        { id: "33-5", name: "妻有の霞", style: "ビール / Alc -", category: "IPA", desc: "妻有の霞" },
+        { id: "33-6", name: "飛渡（とびたり）麹セゾンよしたよした", style: "セゾン / Alc -", category: "Weizen", desc: "飛渡麹セゾンよしたよした" },
+        { id: "33-7", name: "松乃井酒粕セゾン", style: "セゾン / Alc -", category: "Weizen", desc: "松乃井酒粕セゾン" },
+        { id: "33-8", name: "梅の園", style: "フルーツビール / Alc -", category: "Fruit", desc: "梅の園" },
+        { id: "33-9", name: "山椒とレモンのゴールデンエール", style: "ゴールデンエール / Alc -", category: "Fruit", desc: "山椒とレモンのゴールデンエール" },
+        { id: "33-10", name: "村上和紅茶のイングリッシュビター", style: "ビター / Alc -", category: "Porter", desc: "村上和紅茶のイングリッシュビター" }
+      ]
+    },
+    {
+      id: 34,
+      name: "OUR BREWING",
+      location: "北陸・甲信越",
+      top: 43,
+      left: 25,
+      beers: [
+        { id: "34-1", name: "Keyaki Hazy", style: "Hazy IPA / Alc -", category: "IPA", desc: "おすすめKeyaki Hazy" },
+        { id: "34-2", name: "Four Dimensions(フォー・ディメンションズ)", style: "ビール / Alc -", category: "IPA", desc: "Four Dimensions" },
+        { id: "34-3", name: "Hoppy Hour (ホッピー・アワー)", style: "ビール / Alc -", category: "IPA", desc: "おすすめHoppy Hour" },
+        { id: "34-4", name: "Magic Flavour(マジック・フレーバー)", style: "ビール / Alc -", category: "IPA", desc: "Magic Flavour" }
+      ]
+    },
+    {
+      id: 35,
+      name: "牛久醸造場",
+      location: "関東",
+      top: 48,
+      left: 22,
+      beers: [
+        { id: "35-1", name: "Keyaki Twilight Avenue", style: "ビール / Alc -", category: "IPA", desc: "Keyaki Twilight Avenue" },
+        { id: "35-2", name: "Wandervogel IPA ワンダーフォーゲルIPA", style: "IPA / Alc -", category: "IPA", desc: "おすすめWandervogel IPA" },
+        { id: "35-3", name: "笑ふ門には福来る", style: "ビール / Alc -", category: "ピルスナー", desc: "笑ふ門には福来る" },
+        { id: "35-4", name: "Beyond the border ビヨンド ザ ボーダー", style: "ビール / Alc -", category: "IPA", desc: "Beyond the border" },
+        { id: "35-5", name: "Cranberry Dream クランベリードリーム", style: "フルーツ / Alc -", category: "Fruit", desc: "クランベリードリーム（国産はちみつ）" },
+        { id: "35-6", name: "くろネコのタンゴ", style: "ダーク / Alc -", category: "Stout", desc: "くろネコのタンゴ" },
+        { id: "35-7", name: "Wander Ross ワンダーロス", style: "ビール / Alc -", category: "IPA", desc: "Wander Ross" }
+      ]
+    },
+    {
+      id: 36,
+      name: "忽布古丹醸造",
+      location: "北海道",
+      top: 55,
+      left: 30,
+      beers: [
+        { id: "36-1", name: "富良野メロンHazyIPA 【ikor -イコロ-】", style: "Hazy IPA / Alc -", category: "Fruit", desc: "おすすめ富良野メロンHazyIPA" },
+        { id: "36-2", name: "upopo-ウポポ-", style: "ビール / Alc -", category: "IPA", desc: "upopo-ウポポ-" },
+        { id: "36-3", name: "nonno-ノンノ-", style: "ビール / Alc -", category: "IPA", desc: "nonno-ノンノ-" },
+        { id: "36-4", name: "haskap-ハシカプ-", style: "ビール / Alc -", category: "Fruit", desc: "haskap-ハシカプ-" },
+        { id: "36-5", name: "kunne-クンネ-", style: "ビール / Alc -", category: "Stout", desc: "kunne-クンネ-" },
+        { id: "36-6", name: "epitta -エピッタ- 2026", style: "ビール / Alc -", category: "IPA", desc: "epitta -エピッタ- 2026" },
+        { id: "36-7", name: "異邦", style: "ビール / Alc -", category: "IPA", desc: "異邦" },
+        { id: "36-8", name: "Night Walker", style: "ビール / Alc -", category: "IPA", desc: "Night Walker" },
+        { id: "36-9", name: "Ongoing", style: "ビール / Alc -", category: "IPA", desc: "Ongoing" },
+        { id: "36-10", name: "Fiction", style: "ビール / Alc -", category: "IPA", desc: "Fiction" },
+        { id: "36-11", name: "Pollux", style: "ビール / Alc -", category: "IPA", desc: "Pollux" },
+        { id: "36-12", name: "単勝 Mosaic", style: "ビール / Alc -", category: "IPA", desc: "単勝 Mosaic" },
+        { id: "36-13", name: "epana -エパナ- #6", style: "ビール / Alc -", category: "IPA", desc: "epana -エパナ- #6" },
+        { id: "36-14", name: "CoCo麦", style: "限定 / Alc -", category: "Fruit", desc: "限定CoCo麦" },
+        { id: "36-15", name: "走馬橙", style: "限定 / Alc -", category: "Fruit", desc: "限定走馬橙" },
+        { id: "36-16", name: "AKIRA ACT", style: "ビール / Alc -", category: "IPA", desc: "AKIRA ACT" },
+        { id: "36-17", name: "kampoca -カンポチャ-", style: "ビール / Alc -", category: "IPA", desc: "kampoca -カンポチャ-" },
+        { id: "36-18", name: "Time Flies", style: "ビール / Alc -", category: "IPA", desc: "Time Flies" },
+        { id: "36-19", name: "INVERSION", style: "ビール / Alc -", category: "IPA", desc: "INVERSION" },
+        { id: "36-20", name: "AKIRA囃子", style: "ビール / Alc -", category: "IPA", desc: "AKIRA囃子" }
+      ]
+    },
+    {
+      id: 37,
+      name: "アンドビール",
+      location: "北陸・甲信越",
+      top: 58,
+      left: 27,
+      beers: [
+        { id: "37-1", name: "KEYAKI & BEER！", style: "限定 / Alc -", category: "IPA", desc: "おすすめ限定KEYAKI & BEER！" },
+        { id: "37-2", name: "PEACH", style: "ビール / Alc -", category: "Fruit", desc: "PEACH" },
+        { id: "37-3", name: "HOPS", style: "ビール / Alc -", category: "IPA", desc: "HOPS" },
+        { id: "37-4", name: "RICE", style: "ビール / Alc -", category: "ピルスナー", desc: "RICE" }
+      ]
+    },
+    {
+      id: 38,
+      name: "COEDO BREWERY",
+      location: "関東",
+      top: 61,
+      left: 30,
+      beers: [
+        { id: "38-1", name: "SAIBOKU", style: "ビール / Alc -", category: "ピルスナー", desc: "SAIBOKU" },
+        { id: "38-2", name: "毬花-Marihana-", style: "セッションIPA / Alc -", category: "IPA", desc: "毬花-Marihana-" },
+        { id: "38-3", name: "瑠璃-Ruri-", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "瑠璃-Ruri-" },
+        { id: "38-4", name: "伽羅-Kyara-", style: "インディアレッドラガー / Alc -", category: "IPA", desc: "伽羅-Kyara-" },
+        { id: "38-5", name: "白-Shiro-", style: "ヘーフェ・ヴァイツェン / Alc -", category: "Weizen", desc: "白-Shiro-" },
+        { id: "38-6", name: "漆黒-Shikkoku-", style: "黒ビール / Alc -", category: "Stout", desc: "漆黒-Shikkoku-" },
+        { id: "38-7", name: "紅赤-Beniaka-", style: "エール / Alc -", category: "Fruit", desc: "紅赤-Beniaka-" }
+      ]
+    },
+    {
+      id: 39,
+      name: "DD4D BREWING",
+      location: "中国・四国",
+      top: 65,
+      left: 25,
+      beers: [
+        { id: "39-1", name: "Easy Walker - Iyokan Lager for keyaki -", style: "ラガー / Alc -", category: "Fruit", desc: "Easy Walker - Iyokan Lager for keyaki -" },
+        { id: "39-2", name: "4 O'Clock Let's Call it a Day", style: "Brut IPA / Alc -", category: "IPA", desc: "4 O'Clock Let's Call it a Day(Brut IPA)" },
+        { id: "39-3", name: "Don Jalapeño", style: "Jalapeño IPA / Alc -", category: "IPA", desc: "Don Jalapeño（Jalapeño IPA）" },
+        { id: "39-4", name: "Emma", style: "Lavender Hazy IPA / Alc -", category: "IPA", desc: "Emma(Lavender Hazy IPA)" }
+      ]
+    },
+    {
+      id: 40,
+      name: "SIBEERIA BREWERY",
+      location: "海外",
+      top: 68,
+      left: 27,
+      beers: [
+        { id: "40-1", name: "EVERYDAY LIFE", style: "限定 / Alc -", category: "IPA", desc: "おすすめ限定EVERYDAY LIFE" },
+        { id: "40-2", name: "PATRONUS", style: "限定 / Alc -", category: "IPA", desc: "限定PATRONUS" },
+        { id: "40-3", name: "LIQUID LUCK", style: "限定 / Alc -", category: "IPA", desc: "限定LIQUID LUCK" },
+        { id: "40-4", name: "LOLLIHOP", style: "限定 / Alc -", category: "IPA", desc: "限定LOLLIHOP" },
+        { id: "40-5", name: "LOLLIHOP GRAPEFRUIT", style: "限定 / Alc -", category: "Fruit", desc: "限定LOLLIHOP GRAPEFRUIT" },
+        { id: "40-6", name: "VORACIOUS VIPER", style: "限定 / Alc -", category: "IPA", desc: "限定VORACIOUS VIPER" },
+        { id: "40-7", name: "Prague Tap Room 2nd ANNIVERSARY", style: "限定 / Alc -", category: "IPA", desc: "限定Prague Tap Room 2nd ANNIVERSARY" },
+        { id: "40-8", name: "Ensemble", style: "限定 / Alc -", category: "IPA", desc: "限定Ensemble" },
+        { id: "40-9", name: "Smoke Lady", style: "限定 / Alc -", category: "Stout", desc: "限定Smoke Lady" },
+        { id: "40-10", name: "Nostalgie 70s", style: "限定 / Alc -", category: "IPA", desc: "限定Nostalgie 70s" },
+        { id: "40-11", name: "Nostalgie 80s", style: "限定 / Alc -", category: "IPA", desc: "限定Nostalgie 80s" }
+      ]
+    },
+    {
+      id: 41,
+      name: "HOPJAPAN",
+      location: "東北",
+      top: 71,
+      left: 25,
+      beers: [
+        { id: "41-1", name: "けやきメルツェン", style: "メルツェン / Alc -", category: "ピルスナー", desc: "おすすめ限定けやきメルツェン" },
+        { id: "41-2", name: "And Your Day", style: "ビール / Alc -", category: "IPA", desc: "And Your Day" },
+        { id: "41-3", name: "Brain Dance", style: "ビール / Alc -", category: "IPA", desc: "Brain Dance" },
+        { id: "41-4", name: "Abukuma FRESH 2026 ver.", style: "限定 / Alc -", category: "IPA", desc: "限定Abukuma FRESH 2026 ver." },
+        { id: "41-5", name: "Abukuma CRYSTAL", style: "ビール / Alc -", category: "ピルスナー", desc: "Abukuma CRYSTAL" },
+        { id: "41-6", name: "Abukuma GOLD", style: "ビール / Alc -", category: "ピルスナー", desc: "Abukuma GOLD" },
+        { id: "41-7", name: "Abukuma BLACK", style: "ダーク / Alc -", category: "Stout", desc: "Abukuma BLACK" },
+        { id: "41-8", name: "Abukuma RED", style: "レッドエール / Alc -", category: "ピルスナー", desc: "Abukuma RED" },
+        { id: "41-9", name: "Abukuma GREEN", style: "ビール / Alc -", category: "IPA", desc: "Abukuma GREEN" },
+        { id: "41-10", name: "HOPJAPAN White", style: "ホワイトエール / Alc -", category: "Weizen", desc: "HOPJAPAN White" },
+        { id: "41-11", name: "HOP JAPAN IPA", style: "IPA / Alc -", category: "IPA", desc: "HOP JAPAN IPA" }
+      ]
+    },
+    {
+      id: 42,
+      name: "Repubrew",
+      location: "東海",
+      top: 74,
+      left: 27,
+      beers: [
+        { id: "42-1", name: "五枚花の金木犀", style: "限定 / Alc -", category: "Fruit", desc: "限定五枚花の金木犀" },
+        { id: "42-2", name: "69IPA", style: "IPA / Alc -", category: "IPA", desc: "69IPA" },
+        { id: "42-3", name: "本生", style: "ビール / Alc -", category: "ピルスナー", desc: "本生" },
+        { id: "42-4", name: "沼津HAZY IPA", style: "Hazy IPA / Alc -", category: "IPA", desc: "沼津HAZY IPA" },
+        { id: "42-5", name: "CAMPai HAZY", style: "Hazy IPA / Alc -", category: "IPA", desc: "CAMPai HAZY" },
+        { id: "42-6", name: "WILD FUNKYARD CHERRY", style: "ビール / Alc -", category: "Fruit", desc: "WILD FUNKYARD CHERRY" },
+        { id: "42-7", name: "バレルファーメンテーション オーツミルクラテ with ヌテラ", style: "スタウト / Alc -", category: "Stout", desc: "バレルファーメンテーション オーツミルクラテ with ヌテラ" },
+        { id: "42-8", name: "月に変わってお仕置きIPA", style: "限定 / Alc -", category: "IPA", desc: "限定月に変わってお仕置きIPA" },
+        { id: "42-9", name: "紫芋 COOKIE WHEAT", style: "限定 / Alc -", category: "Weizen", desc: "限定紫芋 COOKIE WHEAT" }
+      ]
+    },
+    {
+      id: 43,
+      name: "B.M.B Brewery",
+      location: "九州・沖縄",
+      top: 76,
+      left: 33,
+      beers: [
+        { id: "43-1", name: "Grim Reaper", style: "ビール / Alc -", category: "IPA", desc: "おすすめGrim Reaper" },
+        { id: "43-2", name: "Jane Doe", style: "ビール / Alc -", category: "IPA", desc: "Jane Doe" },
+        { id: "43-3", name: "Cryptid", style: "ビール / Alc -", category: "IPA", desc: "Cryptid" }
+      ]
+    },
+    {
+      id: 44,
+      name: "月と太陽BREWING",
+      location: "北海道",
+      top: 76,
+      left: 37,
+      beers: [
+        { id: "44-1", name: "zzz365 Modern Pale Ale -けやき秋もよろしくね！Ver.-", style: "ペールエール / Alc -", category: "ピルスナー", desc: "限定zzz365 Modern Pale Ale" },
+        { id: "44-2", name: "Pilsner", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "Pilsner" },
+        { id: "44-3", name: "Pale Ale", style: "ペールエール / Alc -", category: "ピルスナー", desc: "Pale Ale" },
+        { id: "44-4", name: "IPA", style: "IPA / Alc -", category: "IPA", desc: "IPA" },
+        { id: "44-5", name: "Nelson Sauvin Lager", style: "ラガー / Alc -", category: "ピルスナー", desc: "Nelson Sauvin Lager" },
+        { id: "44-6", name: "Grapewood", style: "限定 / Alc -", category: "Fruit", desc: "限定Grapewood" },
+        { id: "44-7", name: "HEART BREAK 2026", style: "限定 / Alc -", category: "IPA", desc: "限定HEART BREAK 2026" },
+        { id: "44-8", name: "塩檸檬", style: "限定 / Alc -", category: "Fruit", desc: "限定塩檸檬" },
+        { id: "44-9", name: "HIDAKAMI BEER -COSMIC EDITION-", style: "限定 / Alc -", category: "IPA", desc: "限定HIDAKAMI BEER -COSMIC EDITION-" },
+        { id: "44-10", name: "ASPARA FARM BREW", style: "限定 / Alc -", category: "Fruit", desc: "限定ASPARA FARM BREW" }
+      ]
+    },
+    {
+      id: 45,
+      name: "大山Gビール",
+      location: "中国・四国",
+      top: 76,
+      left: 41,
+      beers: [
+        { id: "45-1", name: "大山Gビール「ヴァイツェン」", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "おすすめ大山Gビール「ヴァイツェン」" },
+        { id: "45-2", name: "大山Gビール「ピルスナー」", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "大山Gビール「ピルスナー」" },
+        { id: "45-3", name: "大山Gビール「スタウト」", style: "スタウト / Alc -", category: "Stout", desc: "おすすめ大山Gビール「スタウト」" },
+        { id: "45-4", name: "大山Gビール「ヴァイツェンボック」", style: "ヴァイツェンボック / Alc -", category: "Weizen", desc: "限定大山Gビール「ヴァイツェンボック」" },
+        { id: "45-5", name: "大山Gビール「八郷」", style: "限定 / Alc -", category: "ピルスナー", desc: "限定大山Gビール「八郷」" },
+        { id: "45-6", name: "大山Gビール「大山ゴールド」", style: "限定 / Alc -", category: "ピルスナー", desc: "限定大山Gビール「大山ゴールド」" },
+        { id: "45-7", name: "大山Gビール「IPA」", style: "IPA / Alc -", category: "IPA", desc: "限定大山Gビール「IPA」" },
+        { id: "45-8", name: "大山Gビール「インペリアルスタウト」", style: "インペリアルスタウト / Alc -", category: "Stout", desc: "限定大山Gビール「インペリアルスタウト」" },
+        { id: "45-9", name: "大山Gビール「ウィートワイン」", style: "ウィートワイン / Alc -", category: "Weizen", desc: "限定大山Gビール「ウィートワイン」" },
+        { id: "45-10", name: "大山Gビール「琥珀ヴァイツェン」", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "大山Gビール「琥珀ヴァイツェン」" },
+        { id: "45-11", name: "大山Gビール「悠々G滴」", style: "ビール / Alc -", category: "ピルスナー", desc: "大山Gビール「悠々G滴」" }
+      ]
+    },
+    {
+      id: 46,
+      name: "NAMACHAん Brewing",
+      location: "関東",
+      top: 74,
+      left: 51,
+      beers: [
+        { id: "46-1", name: "けやき はじまりのIPA～2026秋～", style: "IPA / Alc -", category: "IPA", desc: "おすすめ限定けやき はじまりのIPA～2026秋～" },
+        { id: "46-2", name: "なまちゃんのラオホ", style: "ラオホ / Alc -", category: "Stout", desc: "なまちゃんのラオホ" },
+        { id: "46-3", name: "やみつきエール麻婆", style: "エール / Alc -", category: "Fruit", desc: "やみつきエール麻婆" },
+        { id: "46-4", name: "なまちゃんとキングのサングリアスムージー", style: "スムージー / Alc -", category: "Fruit", desc: "限定なまちゃんとキングのサングリアスムージー" },
+        { id: "46-5", name: "なま初号機", style: "限定 / Alc -", category: "IPA", desc: "限定なま初号機" },
+        { id: "46-6", name: "なまちゃんのプレミアムなラガー", style: "ラガー / Alc -", category: "ピルスナー", desc: "限定なまちゃんのプレミアムなラガー" },
+        { id: "46-7", name: "やみつきエールトムヤムクン", style: "限定 / Alc -", category: "Fruit", desc: "限定やみつきエールトムヤムクン" }
+      ]
+    },
+    {
+      id: 47,
+      name: "田沢湖ビール",
+      location: "東北",
+      top:70,
+      left: 53,
+      beers: [
+        { id: "47-1", name: "KEYAKI ＳＴＡＲＴ Pale Ale", style: "ペールエール / Alc -", category: "ピルスナー", desc: "限定KEYAKI ＳＴＡＲＴ Pale Ale" },
+        { id: "47-2", name: "アルト", style: "アルト / Alc -", category: "Stout", desc: "アルト" },
+        { id: "47-3", name: "ピルスナー", style: "ピルスナー / Alc -", category: "ピルスナー", desc: "ピルスナー" },
+        { id: "47-4", name: "ブリュットIPL", style: "IPL / Alc -", category: "IPA", desc: "ブリュットIPL" },
+        { id: "47-5", name: "バイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "バイツェン" }
+      ]
+    },
+    {
+      id: 48,
+      name: "青蓮さいたま新都心店",
+      location: "関東",
+      top: 66,
+      left: 51,
+      beers: [
+        { id: "48-1", name: "KEYAKI青島ビール", style: "ビール / Alc -", category: "ピルスナー", desc: "おすすめKEYAKI青島ビール" },
+        { id: "48-2", name: "ヱビスプレミアムビール", style: "ビール / Alc -", category: "ピルスナー", desc: "ヱビスプレミアムビール" },
+        { id: "48-3", name: "ヱビスプレミアムブラックビール", style: "黒ビール / Alc -", category: "Stout", desc: "ヱビスプレミアムブラックビール" },
+        { id: "48-4", name: "サッポロ生ビール", style: "ビール / Alc -", category: "ピルスナー", desc: "おすすめサッポロ生ビール" }
+      ]
+    },
+    {
+      id: 49,
+      name: "ドイツビール エルディンガー",
+      location: "海外",
+      top: 61,
+      left: 53,
+      beers: [
+        { id: "49-1", name: "ヴァイスビア", style: "ヴァイスビア / Alc -", category: "Weizen", desc: "ヴァイスビア" },
+        { id: "49-2", name: "デュンケル", style: "デュンケル / Alc -", category: "Stout", desc: "デュンケル" },
+        { id: "49-3", name: "ラガービア", style: "ラガー / Alc -", category: "ピルスナー", desc: "ラガービア" }
+      ]
+    },
+    {
+      id: 50,
+      name: "信州須坂フルーツブルワリー＆マックスキャロット",
+      location: "北陸・甲信越",
+      top: 57,
+      left: 51,
+      beers: [
+        { id: "50-1", name: "KEYAK 巨峰ヴァイツェン", style: "ヴァイツェン / Alc -", category: "Weizen", desc: "限定KEYAK 巨峰ヴァイツェン" },
+        { id: "50-2", name: "KEYAK レッドドライ", style: "限定 / Alc -", category: "Fruit", desc: "限定KEYAK レッドドライ" },
+        { id: "50-3", name: "完熟シャインマスカットエール", style: "フルーツエール / Alc -", category: "Fruit", desc: "完熟シャインマスカットエール" },
+        { id: "50-4", name: "アップルエール 甘口", style: "フルーツエール / Alc -", category: "Fruit", desc: "アップルエール 甘口" },
+        { id: "50-5", name: "プレミアムMix（リンゴ＆ぶどう＆カシス）", style: "フルーツエール / Alc -", category: "Fruit", desc: "プレミアムMix" },
+        { id: "50-6", name: "もも＆カシスMix", style: "フルーツエール / Alc -", category: "Fruit", desc: "もも＆カシスMix" },
+        { id: "50-7", name: "ペールエール", style: "ペールエール / Alc -", category: "ピルスナー", desc: "ペールエール" }
+      ]
+    },
+    {
+      id: 51,
+      name: "希望の丘醸造所",
+      location: "東北",
+      top: 54,
+      left: 53,
+      beers: [
+        { id: "51-1", name: "THE SPENCER（ザ・スペンサー）", style: "ビール / Alc -", category: "IPA", desc: "おすすめTHE SPENCER" },
+        { id: "51-2", name: "KNUCKLE167A（ナックル167A）", style: "ビール / Alc -", category: "IPA", desc: "KNUCKLE167A" },
+        { id: "51-3", name: "Culotte（クーレット）", style: "ビール / Alc -", category: "IPA", desc: "Culotte" },
+        { id: "51-4", name: "HIND SHANK（ハインドシャンク）", style: "ビール / Alc -", category: "IPA", desc: "HIND SHANK" },
+        { id: "51-5", name: "SweetBread（スウィートブレッド）", style: "ビール / Alc -", category: "IPA", desc: "SweetBread" },
+        { id: "51-6", name: "LIVER LIVER LIVER(レバーレバーレバー)", style: "ビール / Alc -", category: "IPA", desc: "LIVER LIVER LIVER" },
+        { id: "51-7", name: "Sun Fun Lager（サンファンラガー）", style: "ラガー / Alc -", category: "ピルスナー", desc: "限定Sun Fun Lager" },
+        { id: "51-8", name: "ごしにけるしゅ", style: "限定 / Alc -", category: "Fruit", desc: "限定ごしにけるしゅ" },
+        { id: "51-9", name: "Honey Golden Ale（ハニーゴールデンエール）", style: "限定 / Alc -", category: "Fruit", desc: "限定Honey Golden Ale" },
+        { id: "51-10", name: "Galactic Comet（ギャラクティックコメット）", style: "限定 / Alc -", category: "IPA", desc: "限定Galactic Comet" },
+        { id: "51-11", name: "Kawatabi Cold IPA", style: "Cold IPA / Alc -", category: "IPA", desc: "限定Kawatabi Cold IPA" }
+      ]
+    },
+    {
+      id: 52,
+      name: "SORACHI 1984",
+      location: "関東",
+      top: 20,
+      left: 28,
+      beers: [
+        { id: "52-1", name: "サッポロ SORACHI 1984", style: "ゴールデンエール / Alc -", category: "IPA", desc: "おすすめサッポロ SORACHI 1984" },
+        { id: "52-2", name: "SORACHI パナシェ", style: "限定 / Alc -", category: "Fruit", desc: "限定SORACHI パナシェ" },
+        { id: "52-3", name: "HAZY SORACHI - Mango-", style: "Hazy IPA / Alc -", category: "Fruit", desc: "HAZY SORACHI - Mango-" },
+        { id: "52-4", name: "HAZY SORACHI - Tomato-", style: "Hazy IPA / Alc -", category: "Fruit", desc: "HAZY SORACHI - Tomato-" }
+      ]
+    }
+  ];
+
+  // ==========================================
+  // 2. localStorage データ管理
+  // ==========================================
+  const STORAGE_KEY = "beer_fest_app_data_v1";
+
+  function loadSavedData() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  }
+
+  function saveData(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  function getBeerState(beerId) {
+    const data = loadSavedData();
+    return data[beerId] || { checked: false, memo: "", photo: null };
+  }
+
+  function updateBeerState(beerId, key, value) {
+    const data = loadSavedData();
+
+    if (!data[beerId]) {
+      data[beerId] = {
+        checked: false,
+        memo: "",
+        photo: null
+      };
+    }
+
+    data[beerId][key] = value;
+    saveData(data);
+    updatePinStates();
+  }
+
+  // ==========================================
+  // 3. UI 制御 (モーダル・リスト表示)
+  // ==========================================
+  let currentBoothId = null;
+
+  function openModal(boothId) {
+    currentBoothId = boothId;
+
+    const booth = boothData.find(b => b.id === boothId);
+    if (!booth) return;
+
+    document.getElementById("boothTitle").innerText = booth.name;
+    document.getElementById("boothLocation").innerText = booth.location;
+
+    const container = document.getElementById("beerListContainer");
+    container.innerHTML = "";
+
+    booth.beers.forEach(beer => {
+      const state = getBeerState(beer.id);
+      const itemEl = document.createElement("div");
+
+      itemEl.className = "beer-item";
+
+      itemEl.innerHTML = `
+        <div class="beer-header">
+          <div>
+            <div class="beer-name">${beer.name}</div>
+            <div class="beer-style">${beer.style}</div>
+          </div>
+
+          <label class="check-wrapper">
+            <input
+              type="checkbox"
+              ${state.checked ? "checked" : ""}
+              data-action="toggle-check"
+              data-beer-id="${beer.id}"
+            >
+            飲みたい！
+          </label>
+        </div>
+
+        <div style="font-size: 0.8rem; color: #475569; margin-bottom: 8px;">
+          ${beer.desc}
+        </div>
+
+        <div class="memo-section">
+          <textarea
+            class="memo-input"
+            placeholder="一言メモ・感想を入力..."
+            data-action="save-memo"
+            data-beer-id="${beer.id}"
+          >${state.memo || ""}</textarea>
+
+          <div>
+            <label class="photo-upload-label">
+              📷 写真を追加 / 撮影
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style="display:none;"
+                data-action="photo-upload"
+                data-beer-id="${beer.id}"
+              >
+            </label>
+          </div>
+
+          <div
+            class="photo-preview"
+            id="photo-preview-${beer.id}"
+            style="${state.photo ? "" : "display:none;"}"
+          >
+            <img
+              src="${state.photo || ""}"
+              id="photo-img-${beer.id}"
+            >
+            <button
+              class="remove-photo"
+              data-action="remove-photo"
+              data-beer-id="${beer.id}"
+            >&times;</button>
+          </div>
+        </div>
+      `;
+
+      container.appendChild(itemEl);
+    });
+
+    document.getElementById("modalOverlay").classList.add("active");
+  }
+
+  function closeModal() {
+    document.getElementById("modalOverlay").classList.remove("active");
+    applyFilter();
+  }
+
+  function closeModalOnOverlay(e) {
+    if (e.target.id === "modalOverlay") {
+      closeModal();
+    }
+  }
+
+  // ==========================================
+  // 4. アクション (チェック・メモ・写真)
+  // ==========================================
+  function toggleCheck(beerId, isChecked) {
+    updateBeerState(beerId, "checked", isChecked);
+  }
+
+  function saveMemo(beerId, text) {
+    updateBeerState(beerId, "memo", text);
+  }
+
+  function handlePhotoUpload(beerId, input) {
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        const base64Img = e.target.result;
+
+        updateBeerState(beerId, "photo", base64Img);
+
+        const previewDiv = document.getElementById(`photo-preview-${beerId}`);
+        const imgTag = document.getElementById(`photo-img-${beerId}`);
+
+        imgTag.src = base64Img;
+        previewDiv.style.display = "inline-block";
+      };
+
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function removePhoto(beerId) {
+    updateBeerState(beerId, "photo", null);
+
+    const previewDiv = document.getElementById(`photo-preview-${beerId}`);
+    const imgTag = document.getElementById(`photo-img-${beerId}`);
+
+    imgTag.src = "";
+    previewDiv.style.display = "none";
+  }
+
+  // ==========================================
+  // 5. ピン状態 & フィルター更新
+  // ==========================================
+  function updatePinStates() {
+    const data = loadSavedData();
+
+    boothData.forEach(booth => {
+      const pinEl = document.getElementById(`pin-${booth.id}`);
+
+      if (!pinEl) return;
+
+      const hasCheckedBeer = booth.beers.some(
+        beer => data[beer.id] && data[beer.id].checked
+      );
+
+      if (hasCheckedBeer) {
+        pinEl.classList.add("has-checked");
+      } else {
+        pinEl.classList.remove("has-checked");
+      }
+    });
+  }
+
+  function applyFilter() {
+    const isFilterCheckedActive =
+      document.getElementById("filterChecked").checked;
+
+    const selectedStyle =
+      document.getElementById("styleSelect").value;
+
+    const data = loadSavedData();
+
+    boothData.forEach(booth => {
+      const pinEl = document.getElementById(`pin-${booth.id}`);
+
+      if (!pinEl) return;
+
+      const hasCheckedBeer = booth.beers.some(
+        beer => data[beer.id] && data[beer.id].checked
+      );
+
+      const matchesCheckFilter =
+        !isFilterCheckedActive || hasCheckedBeer;
+
+      const matchesStyleFilter =
+        !selectedStyle ||
+        booth.beers.some(
+          beer => beer.category === selectedStyle
+        );
+
+      if (matchesCheckFilter && matchesStyleFilter) {
+        pinEl.classList.remove("hidden");
+      } else {
+        pinEl.classList.add("hidden");
+      }
+    });
+  }
+
+  function renderPins() {
+    const container = document.getElementById("pinContainer");
+
+    container.innerHTML = "";
+
+    boothData.forEach(booth => {
+      const pin = document.createElement("div");
+
+      pin.className = "pin";
+      pin.id = `pin-${booth.id}`;
+      pin.style.top = `${booth.top}%`;
+      pin.style.left = `${booth.left}%`;
+
+      // インライン onclick を使用せずイベントリスナーを登録
+      pin.addEventListener("click", () => {
+        openModal(booth.id);
+      });
+
+      pin.innerHTML = `
+        <div class="pin-icon">
+          <span>${booth.id}</span>
+        </div>
+        <div class="pin-label">${booth.name}</div>
+      `;
+
+      container.appendChild(pin);
+    });
+  }
+
+  // ==========================================
+  // 6. 初期化
+  // ==========================================
+  function init() {
+    // フィルターイベント
+    document
+      .getElementById("filterChecked")
+      .addEventListener("change", applyFilter);
+
+    document
+      .getElementById("styleSelect")
+      .addEventListener("change", applyFilter);
+
+    // モーダルイベント
+    document
+      .getElementById("modalOverlay")
+      .addEventListener("click", closeModalOnOverlay);
+
+    document
+      .getElementById("closeModalBtn")
+      .addEventListener("click", closeModal);
+
+    // 動的に生成されるビール一覧のイベントはイベントデリゲーションで処理
+    const beerListContainer =
+      document.getElementById("beerListContainer");
+
+    beerListContainer.addEventListener("change", event => {
+      const target = event.target;
+      const beerId = target.dataset.beerId;
+
+      if (!beerId) return;
+
+      if (target.dataset.action === "toggle-check") {
+        toggleCheck(beerId, target.checked);
+      } else if (target.dataset.action === "save-memo") {
+        saveMemo(beerId, target.value);
+      } else if (target.dataset.action === "photo-upload") {
+        handlePhotoUpload(beerId, target);
+      }
+    });
+
+    beerListContainer.addEventListener("click", event => {
+      const target = event.target.closest(
+        '[data-action="remove-photo"]'
+      );
+
+      if (!target) return;
+
+      removePhoto(target.dataset.beerId);
+    });
+
+    renderPins();
+    updatePinStates();
+  }
+
+  // window.onload ではなく DOMContentLoaded を使用
+  document.addEventListener("DOMContentLoaded", init);
+
+})();
+</script>
+
+</body>
+</html>
